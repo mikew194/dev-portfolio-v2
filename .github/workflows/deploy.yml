@@ -1,0 +1,48 @@
+# .github/workflows/deploy.yml
+# This workflow deploys the Blazor WASM app to GitHub Pages.
+
+name: Deploy Blazor to GitHub Pages
+
+on:
+  push:
+    branches:
+      - main # Set this to the branch you want to deploy from (e.g., main or master)
+  workflow_dispatch: # Allows manual trigger of the workflow
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest # Uses the latest Ubuntu runner
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4 # Checks out your repository code
+
+      - name: Setup .NET SDK
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '9.0.6' # Specifies to use .NET 8 SDK
+
+      - name: Restore Dependencies
+        run: dotnet restore # Restores NuGet packages
+
+      - name: Build Project
+        run: dotnet publish dev-portfolio.csproj -c Release -o release --nologo # Builds the Blazor app in Release mode
+
+      - name: Adjust base href for GitHub Pages
+        # The base href in index.html needs to match the repository name for GitHub Pages to serve assets correctly.
+        # This script replaces the placeholder base href with the actual repository name.
+        run: |
+          # Get the repository name from the GITHUB_REPOSITORY environment variable
+          # e.g., 'your-username/dev-portfolio' -> 'dev-portfolio'
+          REPO_NAME=$(echo ${{ github.repository }} | cut -d '/' -f 2)
+          # Replace the base href in wwwroot/index.html
+          sed -i "s|<base href=\"/dev-portfolio/\" />|<base href=\"/${REPO_NAME}/\" />|g" release/wwwroot/index.html
+
+      - name: Deploy to GitHub Pages
+        uses: peaceiris/actions-gh-pages@v4 # Action for deploying to GitHub Pages
+        if: github.ref == 'refs/heads/main' # Only deploy if pushing to the main branch
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }} # GitHub token for authentication
+          publish_dir: release/wwwroot # Directory containing the built Blazor app
+          # By default, it publishes to the 'gh-pages' branch.
+          # You can configure your GitHub Pages settings to serve from this branch.
